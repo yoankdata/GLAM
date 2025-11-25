@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { MapPin, ChevronLeft, Instagram, MessageCircle } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { Database } from '@/types/database.types';
-import { getSupabaseClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { formatPrice } from '@/lib/formatPrice';
 
 type ProviderRow = Database['public']['Tables']['providers']['Row'];
@@ -19,8 +19,6 @@ export const metadata: Metadata = {
 };
 
 async function getProviderBySlug(slug: string): Promise<ProviderRow | null> {
-  const supabase = getSupabaseClient();
-
   const { data, error } = await supabase
     .from('providers')
     .select('*')
@@ -79,7 +77,7 @@ export default async function ProviderDetailPage({ params }: PageProps) {
               src={
                 provider.main_photo_url && provider.main_photo_url.trim() !== ''
                   ? provider.main_photo_url
-                  : '/images/providers/placeholder.jpg' // <<< placeholder fiable
+                  : '/images/providers/placeholder.jpg'
               }
               alt={provider.name}
               fill
