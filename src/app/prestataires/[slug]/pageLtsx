@@ -1,0 +1,150 @@
+import { supabase } from '@/lib/supabase';
+import { notFound } from 'next/navigation';
+import Image from 'next/image';
+import { MapPin, Instagram, Check, Phone, MessageCircle } from 'lucide-react';
+import { formatPrice } from '@/components/UIComponents';
+import type { Metadata } from 'next';
+import type { Database } from '@/types/database.types';
+
+// Définition du type Prestataire
+type ProviderRow = Database['public']['Tables']['providers']['Row'];
+
+// Génération des métadonnées SEO dynamiques (Server Component)
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('name, bio')
+    .eq('slug', params.slug)
+    .single();
+
+  if (!provider) return { title: 'Prestataire introuvable' };
+  
+  return {
+    title: `${provider.name} | Coiffure & Beauté à Abidjan - GLAM.CI`,
+    description: provider.bio.substring(0, 150) + '...',
+  };
+}
+
+export default async function ProviderPage({ params }: { params: { slug: string } }) {
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('*')
+    .eq('slug', params.slug)
+    .single() as { data: ProviderRow | null }; // Typage pour Next.js
+
+  if (!provider) return notFound();
+
+  // URL WhatsApp: utilise le numéro sans le préfixe +225 si possible (standard wa.me)
+  const waNumber = provider.whatsapp.startsWith('225') ? provider.whatsapp : `225${provider.whatsapp}`;
+
+  return (
+    <div className="min-h-screen pb-20">
+      
+      {/* Header Image (Main Photo) */}
+      <div className="h-[40vh] md:h-[50vh] relative bg-gray-200">
+        <Image 
+            src={provider.main_photo_url || "https://placehold.co/1200x600/D4A6A8/ffffff?text=GLAM.CI"} 
+            alt={provider.name} 
+            fill 
+            className="object-cover" 
+            priority 
+            sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+        <div className="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto">
+          <h1 className="text-4xl md:text-6xl font-serif text-white font-bold mb-2">{provider.name}</h1>
+          <div className="flex flex-wrap items-center text-white/90 gap-x-6 gap-y-2">
+            <span className="flex items-center gap-1"><MapPin size={18} /> {provider.commune}</span>
+            {provider.instagram && (
+                <a href={`https://instagram.com/${provider.instagram}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-white transition-colors">
+                    <Instagram size={18} /> @{provider.instagram}
+                </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 -mt-10 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Contenu Principal */}
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white p-8 rounded-2xl shadow-xl border border-[#E8D0C8]">
+              <h2 className="font-serif text-3xl font-bold text-[#D4A6A8] mb-4">À propos de {provider.name}</h2>
+              <p className="text-gray-600 leading-relaxed whitespace-pre-line mb-6">{provider.bio}</p>
+              <div className="flex flex-wrap gap-2">
+                {provider.specialties?.map((s: string) => (
+                  <span key={s} className="bg-[#FAF9F7] text-gray-700 border border-[#E8D0C8] px-3 py-1 rounded-full text-sm font-medium">{s}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Portfolio */}
+            {provider.portfolio_photo_urls && provider.portfolio_photo_urls.length > 0 && (
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-[#E8D0C8]">
+                <h2 className="font-serif text-2xl font-bold mb-6">Quelques réalisations</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {provider.portfolio_photo_urls.map((url: string, idx: number) => (
+                    <div key={idx} className="relative aspect-square w-full">
+                       <Image 
+                            src={url} 
+                            alt={`Portfolio ${idx} de ${provider.name}`} 
+                            fill 
+                            className="object-cover rounded-lg shadow-md" 
+                            sizes="(max-width: 768px) 50vw, 30vw"
+                        />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar CTA (Call to Action) */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-2xl shadow-lg border border-[#E8D0C8] sticky top-24">
+              
+              {/* Prix et Prestations */}
+              <div className="text-center mb-6 pb-6 border-b border-gray-100">
+                <span className="text-gray-500 text-sm">Tarifs indicatifs à partir de</span>
+                <div className="text-4xl font-bold text-[#D4A6A8] font-serif mt-1">{formatPrice(provider.price_min)}</div>
+              </div>
+
+              {provider.services_details && provider.services_details.length > 0 && (
+                  <div className="space-y-4 mb-8">
+                    <h3 className="font-bold text-gray-900 border-b border-gray-100 pb-2 mb-3">Services Proposés</h3>
+                    <ul className="space-y-2">
+                      {provider.services_details?.map((service: string, i: number) => (
+                        <li key={i} className="flex items-start text-gray-600">
+                          <Check size={16} className="text-[#D4A6A8] mr-2 flex-shrink-0 mt-0.5" /> 
+                          <span className="text-sm">{service}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+              )}
+
+              {/* Boutons de Contact */}
+              <div className="space-y-3">
+                <a 
+                   href={`https://wa.me/${waNumber}`} 
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="w-full bg-[#35A549] text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#2e8c3b] transition-colors shadow-lg"
+                >
+                  <MessageCircle size={18} /> Envoyer un message WhatsApp
+                </a>
+                <a 
+                  href={`tel:${provider.whatsapp}`}
+                  className="w-full bg-white border border-[#D4A6A8] text-[#D4A6A8] py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+                >
+                  <Phone size={18} /> Appeler directement
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
