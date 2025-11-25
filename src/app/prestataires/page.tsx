@@ -1,17 +1,18 @@
 // src/app/prestataires/page.tsx
 'use client';
-// Page côté client pour gérer recherche + filtres + tri dynamique
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ProviderCard } from '@/components/UIComponents';
-import { Search } from 'lucide-react';
 import type { Database } from '@/types/database.types';
 
-// Typage strict
 type ProviderRow = Database['public']['Tables']['providers']['Row'];
 
 export default function ListingPage() {
+  const searchParams = useSearchParams();
+
   const [providers, setProviders] = useState<ProviderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -20,7 +21,13 @@ export default function ListingPage() {
     search: '',
   });
 
-  // Chargement des données au montage
+  // Initialise la recherche avec ?search= depuis l'URL (venant de la Home)
+  useEffect(() => {
+    const initialSearch = searchParams.get('search') || '';
+    setFilters((prev) => ({ ...prev, search: initialSearch }));
+  }, [searchParams]);
+
+  // Charge tous les prestataires actifs au montage
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -36,20 +43,17 @@ export default function ListingPage() {
       }
 
       if (data) {
-        // 1. Priorité Premium → Pro → Standard
-        const rank = {
+        const rank: Record<string, number> = {
           premium_annuel: 3,
           pro_annuel: 2,
           standard_trimestre: 1,
         };
 
         const sorted = [...data].sort((a, b) => {
-          const pa = rank[a.plan as keyof typeof rank] || 0;
-          const pb = rank[b.plan as keyof typeof rank] || 0;
+          const pa = rank[a.plan ?? ''] || 0;
+          const pb = rank[b.plan ?? ''] || 0;
 
-          if (pa !== pb) return pb - pa; // Premium d’abord
-
-          // 2. Sinon plus récent d’abord
+          if (pa !== pb) return pb - pa;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
 
@@ -62,27 +66,21 @@ export default function ListingPage() {
     fetchData();
   }, []);
 
-  // Filtres dynamiques locaux
+  // Filtres locaux
   const filtered = providers.filter((p) => {
-    // Catégorie (specialties contient un tableau)
     if (filters.category && !p.specialties.includes(filters.category)) return false;
-
-    // Commune
     if (filters.commune && p.commune !== filters.commune) return false;
 
-    // Search → Nom + Bio
     if (filters.search) {
       const term = filters.search.toLowerCase();
-      return (
-        p.name.toLowerCase().includes(term) ||
-        (p.bio || '').toLowerCase().includes(term)
-      );
+      const inName = p.name.toLowerCase().includes(term);
+      const inBio = (p.bio || '').toLowerCase().includes(term);
+      return inName || inBio;
     }
 
     return true;
   });
 
-  // Données statiques (MVP)
   const CATEGORIES = [
     'Coiffure',
     'Ongles',
@@ -92,6 +90,7 @@ export default function ListingPage() {
     'Massage',
     'Épilation',
   ];
+
   const COMMUNES = [
     'Cocody',
     'Marcory',
@@ -112,10 +111,10 @@ export default function ListingPage() {
         </h1>
       </div>
 
-      {/* Filtres Sticky */}
+      {/* Barre de recherche + filtres (sticky) */}
       <div className="bg-white border-b border-[#E8D0C8] sticky top-20 z-40 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row gap-4 items-center">
-          {/* Champ search */}
+          {/* Recherche texte */}
           <div className="relative flex-grow w-full">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -125,22 +124,18 @@ export default function ListingPage() {
               type="text"
               placeholder="Rechercher (ex: Tresses à Cocody)..."
               className="w-full pl-10 pr-4 py-3 bg-[#FAF9F7] border border-[#E8D0C8] rounded-xl 
-              focus:outline-none focus:ring-1 focus:ring-[#D4A6A8] transition-all"
+                         focus:outline-none focus:ring-1 focus:ring-[#D4A6A8] transition-all"
               value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
             />
           </div>
 
-          {/* Select Catégorie */}
+          {/* Filtre Catégorie */}
           <select
             className="px-4 py-3 bg-[#FAF9F7] border border-[#E8D0C8] rounded-xl focus:ring-1 
-            focus:ring-[#D4A6A8] transition-all"
+                       focus:ring-[#D4A6A8] transition-all w-full md:w-auto"
             value={filters.category}
-            onChange={(e) =>
-              setFilters({ ...filters, category: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, category: e.target.value })}
           >
             <option value="">Toutes catégories</option>
             {CATEGORIES.map((c) => (
@@ -150,14 +145,12 @@ export default function ListingPage() {
             ))}
           </select>
 
-          {/* Select Commune */}
+          {/* Filtre Commune */}
           <select
             className="px-4 py-3 bg-[#FAF9F7] border border-[#E8D0C8] rounded-xl focus:ring-1 
-            focus:ring-[#D4A6A8] transition-all"
+                       focus:ring-[#D4A6A8] transition-all w-full md:w-auto"
             value={filters.commune}
-            onChange={(e) =>
-              setFilters({ ...filters, commune: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, commune: e.target.value })}
           >
             <option value="">Toutes communes</option>
             {COMMUNES.map((c) => (
@@ -188,10 +181,8 @@ export default function ListingPage() {
             </div>
 
             {filtered.length === 0 && (
-              <div className="text-center py-20 text-gray-500 bg-white p-8 rounded-xl border border-[#E8D0C8]">
-                <h2 className="font-serif text-2xl mb-2">
-                  Aucun résultat trouvé
-                </h2>
+              <div className="text-center py-20 text-gray-500 bg-white p-8 rounded-xl border border-[#E8D0C8] mt-8">
+                <h2 className="font-serif text-2xl mb-2">Aucun résultat trouvé</h2>
                 <p>Essayez d&apos;autres mots-clés ou ajustez les filtres.</p>
               </div>
             )}

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { MapPin, ChevronLeft, Instagram, MessageCircle } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { Database } from '@/types/database.types';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import { formatPrice } from '@/lib/formatPrice';
 
 type ProviderRow = Database['public']['Tables']['providers']['Row'];
@@ -19,6 +19,8 @@ export const metadata: Metadata = {
 };
 
 async function getProviderBySlug(slug: string): Promise<ProviderRow | null> {
+  const supabase = getSupabaseClient();
+
   const { data, error } = await supabase
     .from('providers')
     .select('*')
@@ -53,7 +55,7 @@ export default async function ProviderDetailPage({ params }: PageProps) {
     );
   }
 
-  const services = provider.services_details || [];
+  const services = (provider.services_details ?? []) as string[];
 
   return (
     <div className="min-h-screen bg-[#FAF9F7]">
@@ -74,7 +76,11 @@ export default async function ProviderDetailPage({ params }: PageProps) {
           <div className="relative w-full aspect-[4/3] bg-gray-100 rounded-3xl overflow-hidden">
             <Image
               unoptimized
-              src={provider.main_photo_url || '/images/providers/placeholder.jpg'}
+              src={
+                provider.main_photo_url && provider.main_photo_url.trim() !== ''
+                  ? provider.main_photo_url
+                  : '/images/providers/placeholder.jpg' // <<< placeholder fiable
+              }
               alt={provider.name}
               fill
               className="object-cover"
@@ -171,8 +177,7 @@ export default async function ProviderDetailPage({ params }: PageProps) {
               </ul>
             ) : (
               <p className="text-sm text-gray-500">
-                Les services détaillés seront bientôt ajoutés pour ce
-                prestataire.
+                Les services détaillés seront bientôt ajoutés pour ce prestataire.
               </p>
             )}
           </div>
